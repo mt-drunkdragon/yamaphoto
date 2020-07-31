@@ -15,13 +15,7 @@ from tkinter import messagebox
 from tkinter import ttk
 from tkinter import filedialog
 TITLE = u"yamareco photo backup"
-
-# プロキシーを通す場合は以下を設定
-PROXIES = {
-#    'http': 'http://proxy.yourdomain.com:8080',
-#    'https': 'https://proxy.yourdomain.com:8080',
-#    'ftp': 'ftp://proxy.yourdomain.com:8080'
-}
+PROXIES = {}
 
 def dirButton_clicked():
     path = filedialog.askdirectory()
@@ -50,7 +44,7 @@ def getPhotos(url, dir, local):
 
         photo_area = soup.find('div', class_='photo_area')
         if photo_area is None:
-            raise ValueError(u"写真データが取得できません\n認証が必要なのかもしれません(未サポート)")
+            raise ValueError(u"写真データが取得できません\n「ヤマレコ限定」なのかもしれません(未サポート)")
         photos = []
         i = 0
         for item in photo_area.find_all('div', class_='item'):
@@ -100,7 +94,23 @@ if __name__ == "__main__":
     p.add_argument("-u", "--url", help=u"ヤマレコ山行記録URL")
     p.add_argument("-d", "--dir", help=u"destination directory")
     p.add_argument("-l", "--local", action='store_true', help=u"save images locally")
+    p.add_argument("-p", "--proxy", help=u"proxy server")
     args = p.parse_args()
+
+    if args.proxy is None:
+        proxy = os.getenv('HTTP_PROXY')
+        if proxy is not None:
+            PROXIES['http'] = proxy
+        proxy = os.getenv('HTTPS_PROXY')
+        if proxy is not None:
+            PROXIES['https'] = proxy
+        proxy = os.getenv('FTP_PROXY')
+        if proxy is not None:
+            PROXIES['ftp'] = proxy
+    else:
+        PROXIES['http'] = args.proxy
+        PROXIES['https'] = args.proxy
+        PROXIES['ftp'] = args.proxy
 
     if args.url is None or args.dir is None:
         root = tkinter.Tk()
