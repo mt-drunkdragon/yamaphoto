@@ -14,8 +14,12 @@ import tkinter
 from tkinter import messagebox
 from tkinter import ttk
 from tkinter import filedialog
+import logging
+
 TITLE = u"yamareco photo backup"
 PROXIES = {}
+GUI = False
+
 
 def dirButton_clicked():
     path = filedialog.askdirectory()
@@ -26,7 +30,7 @@ def getPhotosGUI():
     root.destroy()
 
 def getPhotos(url, dir, local):
-    try:
+#    try:
         os.chdir(dir)
 
         r = requests.get(url, proxies=PROXIES)
@@ -34,58 +38,62 @@ def getPhotos(url, dir, local):
         soup = BeautifulSoup(r.text, "html.parser")
         r.close()
 
-        m = re.search('detail-(\d+).html', url)
-        photodir = 'photo-' + m.group(1)
+        m = re.search("detail-(\d+).html", url)
+        photodir = "photo-" + m.group(1)
         indexfile = m.group()
         if local:
             os.makedirs(photodir, exist_ok=True)
 
-        title = soup.find('title').text
+        title = soup.find("title").text
+        logging.debug(title)
 
-        photo_area = soup.find('div', class_='photo_area')
+        photo_area = soup.find("div", class_="photo_area")
         if photo_area is None:
-            raise ValueError(u"写真データが取得できません\n「ヤマレコ限定」なのかもしれません(未サポート)")
-        photos = []
-        i = 0
-        for item in photo_area.find_all('div', class_='item'):
-            i += 1
-            # get original photo
-            d = item.find('span', class_='highslide-caption')
-            d.find('div').decompose()
-            d.find('span').decompose()
-            photo = d.find_all('a')[1].get('href')
-            # get image
-            if local:
-                r = requests.get(photo, proxies=PROXIES)
-                photo = photodir + '/' + '%03d.jpg' % i
-                with open(photo, "wb") as f:
-                    f.write(r.content)
-                r.close()
-            # get photo caption
-            c = item
-            c.find('div').decompose()
-            c.find('span').decompose()
-            caption = c.text
-            photos.append((photo, caption))
-
-        with open(indexfile, 'w') as file:
+            if GUI:
+                messagebox.showerror(title=TITLE, message=u"写真データが取得できません")
+            else:
+                print("Error: no photo data")   
+        else:
+            photos = []
             i = 0
-            print("<html><head><title>%s</title></head><body>" % title, file=file)
-            for photo in photos:
+            for item in photo_area.find_all("div", class_="item"):
                 i += 1
-                print("<figure id=\"%03d\"><img src=\"%s\" width=\"100%%\" alt=\"%s\" title=\"%s\" /><figcaption>%s</figcaption></figure>" % (i, photo[0], photo[0], photo[1], photo[1]), file=file)
-            print("</body></html>", file=file)
+                logging.debug(i)
+                # get original photo
+                d = item.find("span", class_="highslide-caption")
+                photo = d.find("a", text=re.compile("元サイズ")).get("href")
+                # get image
+                if local:
+                    r = requests.get(photo, proxies=PROXIES)
+                    photo = photodir + "/" + "%03d.jpg" % i
+                    with open(photo, "wb") as f:
+                        f.write(r.content)
+                    r.close()
+                # get photo caption
+                c = item
+                for t in c.find_all(["div", "span", "a"]):
+                    t.decompose()
+                caption = c.text
+                photos.append((photo, caption))
 
-        gpxurl = re.sub('detail', 'track', url)
-        gpxurl = re.sub('html', 'gpx', gpxurl)
-        gpxfile = re.search('track-\d+.gpx', gpxurl).group()
+            with open(indexfile, "w", encoding="utf-8") as file:
+                i = 0
+                print("<html><head><title>%s</title></head><body>" % title, file=file)
+                for photo in photos:
+                    i += 1
+                    print("<figure id=\"%03d\"><img src=\"%s\" width=\"100%%\" alt=\"%s\" title=\"%s\" /><figcaption>%s</figcaption></figure>" % (i, photo[0], photo[0], photo[1], photo[1]), file=file)
+                print("</body></html>", file=file)
+
+        gpxurl = re.sub("detail", "track", url)
+        gpxurl = re.sub("html", "gpx", gpxurl)
+        gpxfile = re.search("track-\d+.gpx", gpxurl).group()
         r = requests.get(gpxurl, proxies=PROXIES)
-        with open(gpxfile, mode='wb') as f:
+        with open(gpxfile, mode="wb") as f:
              f.write(r.content)
         r.close()
 
-    except Exception as e:
-        messagebox.showerror(title=TITLE, message=str(e))
+#    except Exception as e:
+#        messagebox.showerror(title=TITLE, message=str(e))
 
 
 if __name__ == "__main__":
@@ -93,26 +101,27 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("-u", "--url", help=u"ヤマレコ山行記録URL")
     p.add_argument("-d", "--dir", help=u"destination directory")
-    p.add_argument("-l", "--local", action='store_true', help=u"save images locally")
+    p.add_argument("-l", "--local", action="store_true", help=u"save images locally")
     p.add_argument("-p", "--proxy", help=u"proxy server")
     args = p.parse_args()
 
     if args.proxy is None:
-        proxy = os.getenv('HTTP_PROXY')
+        proxy = os.getenv("HTTP_PROXY")
         if proxy is not None:
-            PROXIES['http'] = proxy
-        proxy = os.getenv('HTTPS_PROXY')
+            PROXIES["http"] = proxy
+        proxy = os.getenv("HTTPS_PROXY")
         if proxy is not None:
-            PROXIES['https'] = proxy
-        proxy = os.getenv('FTP_PROXY')
+            PROXIES["https"] = proxy
+        proxy = os.getenv("FTP_PROXY")
         if proxy is not None:
-            PROXIES['ftp'] = proxy
+            PROXIES["ftp"] = proxy
     else:
-        PROXIES['http'] = args.proxy
-        PROXIES['https'] = args.proxy
-        PROXIES['ftp'] = args.proxy
+        PROXIES["http"] = args.proxy
+        PROXIES["https"] = args.proxy
+        PROXIES["ftp"] = args.proxy
 
     if args.url is None or args.dir is None:
+        GUI = True
         root = tkinter.Tk()
         urlVar = tkinter.StringVar()
         dirVar = tkinter.StringVar()
