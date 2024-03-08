@@ -46,6 +46,11 @@ def getPhotos(url, dir, local):
         soup = BeautifulSoup(r.text, "html.parser")
         r.close()
 
+        ### first, check if the article is accessed 
+        owner_name = soup.find("div", class_="sidebar-right-owner-name")
+        if owner_name is None:
+            raise ValueError("The record cannot be get as it may be draft or private.")
+
         m = re.search(r"detail-(\d+).html", url)
         infofile = "info-" + m.group(1) + ".txt"
         photodir = "photo-" + m.group(1)
@@ -54,9 +59,7 @@ def getPhotos(url, dir, local):
             os.makedirs(photodir, exist_ok=True)
         info = open(infofile, "w", encoding="utf-8")
 
-
         ### Retrieve various info
-        owner_name = soup.find("div", class_="sidebar-right-owner-name")
         owner_id = soup.find("div", class_="sidebar-right-owner-id")
         print("Owner: %s %s" % (owner_name.text, owner_id.text), file=info)
         
